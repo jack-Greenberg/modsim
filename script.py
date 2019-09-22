@@ -1,5 +1,8 @@
 from streets.intersection import Intersection
-# from streets.street import Street
+import random
+from datetime import datetime
+
+random.seed()
 
 class Grid(object):
     """
@@ -63,11 +66,18 @@ class Grid(object):
         return "".join(string)
     
     def step(self):
-        for i in self.intersections:
-            if (i.position[0] in [0, self.width - 1]) or (i.position[1] in [0, self.height - 1]):
-                pass
-        return self.intersections
+        for i in self.intersections: # for each coordinate
+            if (i[0] in [0, self.width - 1]) or (i[1] in [0, self.height - 1]): # if it is an edge coordinate
+                # for each edge coordinate:
+                random.seed()
+                if self.p_enter > random.randint(0, 100) * 0.01:
+                    # Add car to graph
+                    print("Car enters")
 
-grid = Grid(4,3, .1, .2)
-print(grid)
-# print(grid.step())
+                random.seed()
+                if self.p_exit > random.randint(0, 100) * 0.01:
+                    # Add car to graph
+                    print("Car exits")
+
+grid = Grid(3, 3, .1, .2)
+grid.step()
