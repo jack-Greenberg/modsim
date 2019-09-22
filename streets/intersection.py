@@ -10,5 +10,11 @@ class Intersection(object):
         self.light_state = light_state
         self.light_timing = light_timing
 
+    def __str__(self):
+        return ",".join(str(m) for m in self.position)
+
+    def __repr__(self):
+        return ",".join(str(m) for m in self.position)
+
     def change_light(self):
         self.light_state = not self.light_state
