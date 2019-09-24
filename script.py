@@ -2,8 +2,6 @@ from streets.intersection import Intersection
 import random
 from datetime import datetime
 
-random.seed()
-
 class Grid(object):
     """
     width (int): Number of intersections on the x-axis
@@ -13,20 +11,26 @@ class Grid(object):
     street_length (int): Number of cars each street can hold
 
     intersections: {
-        (x_coord, y_coord): Intersection((x, y), timing, light_state)
+        (x_coord, y_coord): Intersection((x, y), timing, light_state),
+        ...
     }
     graph: {
-        (Intersection1, Intersection2): (cars on primary axis, cars on secondary axis)
+        (Intersection1, Intersection2): (cars waiting for Intersection1, cars waiting for Intersection2),
+        ...
     }
     """
-    def __init__(self, width, height, p_enter, p_exit):
+    def __init__(self, width, height, p_enter):
         self.width = width
         self.height = height
         self.p_enter = p_enter
-        self.p_exit = p_exit
         self.intersections = {}
         self.graph = {}
-
+        self.corners = [
+            (0,0),
+            (0, self.width-1),
+            (self.height-1, 0),
+            (self.width-1, self.height-1)
+        ]
         for i in range(width):
             for j in range(height):
                 self.intersections[(i, j)] = Intersection((i, j), 60, True)
@@ -66,18 +70,37 @@ class Grid(object):
         return "".join(string)
     
     def step(self):
+        #* Determine if cars should be added to the system
         for i in self.intersections: # for each coordinate
-            if (i[0] in [0, self.width - 1]) or (i[1] in [0, self.height - 1]): # if it is an edge coordinate
+            if i in self.corners:
+                random.seed()
+                if self.p_enter > random.randint(0, 100) * 0.01:
+                    if random.randint(0, 100) * 0.01 < 0.5:
+                        print("enter at (" + ", ".join(str(j) for j in i) + ") primary") # enter at (0, 0) primary
+                        # street = self.graph[(i, self.intersections[(i[0], i[1] + 1)])]
+                    else:
+                        print("enter at (" + ", ".join(str(j) for j in i) + ") secondary") # enter at (0, 0) secondary
+                random.seed()
+                if self.p_exit > random.randint(0, 100) * 0.01:
+                    if random.randint(0, 100) * 0.01 < 0.5:
+                        print("exit at (" + ", ".join(str(j) for j in i) + ") primary") # exit at (0, 0) primary
+                    else:
+                        print("exit at (" + ", ".join(str(j) for j in i) + ") secondary") # exit at (0, 0) secondary
+            elif (i[0] in [0, self.width - 1]) or (i[1] in [0, self.height - 1]): # if it is an edge coordinate
                 # for each edge coordinate:
                 random.seed()
                 if self.p_enter > random.randint(0, 100) * 0.01:
-                    # Add car to graph
-                    print("Car enters")
+                    print("enter at (" + ", ".join(str(j) for j in i) + ")") # enter at (0, 0)
 
                 random.seed()
                 if self.p_exit > random.randint(0, 100) * 0.01:
-                    # Add car to graph
-                    print("Car exits")
+                    print("exit at (" + ", ".join(str(j) for j in i) + ")") # exit at (0, 0)
+                    
+        #* Move cars through grid
+        pass
 
-grid = Grid(3, 3, .1, .2)
-grid.step()
+my_grid = Grid(3, 3, .1)
+my_grid.step()
+
+# for t in range(100):
+#     grid.step()
