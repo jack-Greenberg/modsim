@@ -14,3 +14,6 @@ class Lane(object):
         self.next_intersections = next_intersections
         self.length = length
         self.queue = [ False for m in range(length) ]
+
+    def __repr__(self):
+        return '[' + ', '.join([str(i) for i in self.queue]) + ']'
