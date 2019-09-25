@@ -1,4 +1,5 @@
 from streets.intersection import Intersection
+from streets.lane import Lane
 import random
 from datetime import datetime
 
@@ -19,10 +20,11 @@ class Grid(object):
         ...
     }
     """
-    def __init__(self, width, height, p_enter):
+    def __init__(self, width, height, p_enter, street_length):
         self.width = width
         self.height = height
         self.p_enter = p_enter
+        self.street_length = street_length
         self.intersections = {}
         self.graph = {}
         self.corners = [
@@ -41,66 +43,124 @@ class Grid(object):
 
             intersection1 = self.intersections[(x_coord, y_coord)]
 
-            try: # Attempting to create the x-axis connections between intersections
+            
+            try: #! Primary Axis
                 intersection2 = self.intersections[(x_coord + 1, y_coord)]
-                self.graph[(intersection1, intersection2)] = (0, 0)
+
+                if (x_coord + 2) in range(0, self.width): ###! Lane1
+                    lane1 = Lane(
+                        intersection1,
+                        intersection2,
+                        next_intersections=(
+                            intersection2,
+                            self.intersections[(x_coord + 2, y_coord)]
+                        ),
+                        length=self.street_length
+                    )
+                else:
+                    lane1 = Lane(
+                        intersection1,
+                        intersection2,
+                        next_intersections=(
+                            intersection2,
+                            None
+                        ),
+                        length=self.street_length
+                    )
+
+                if (x_coord - 1) in range(0, self.width): ###! Lane2
+                    lane2 = Lane(
+                        intersection2,
+                        intersection1,
+                        next_intersections=(
+                            intersection1,
+                            self.intersections[(x_coord - 1, y_coord)]
+                        ),
+                        length=self.street_length
+                    )
+                else:
+                    lane2 = Lane(
+                        intersection2,
+                        intersection1,
+                        next_intersections=(
+                            intersection1,
+                            None
+                        ),
+                        length=self.street_length
+                    )
+                self.graph[(intersection1, intersection2)] = (lane1, lane2)
             except KeyError:
                 pass
 
-            try: # Attempting to create the y-axis connections between intersections
-                intersection3 = self.intersections[(x_coord, y_coord + 1)]
-                self.graph[(intersection1, intersection3)] = (0, 0)
+            try: #! Secondary Axis
+                intersection2 = self.intersections[(x_coord, y_coord + 1)]
+
+                if (y_coord + 2) in range(0, self.height): ###! Lane1
+                    lane1 = Lane(
+                        intersection1,
+                        intersection2,
+                        next_intersections=(
+                            intersection2,
+                            self.intersections[(x_coord, y_coord + 2)]
+                        ),
+                        length=self.street_length
+                    )
+                else:
+                    lane1 = Lane(
+                        intersection1,
+                        intersection2,
+                        next_intersections=(
+                            intersection2,
+                            None
+                        ),
+                        length=self.street_length
+                    )
+
+                if (y_coord - 1) in range(0, self.height): ###! Lane2
+                    lane2 = Lane(
+                        intersection2,
+                        intersection1,
+                        next_intersections=(
+                            intersection1,
+                            self.intersections[(x_coord, y_coord - 1)]
+                        ),
+                        length=self.street_length
+                    )
+                else:
+                    lane2 = Lane(
+                        intersection2,
+                        intersection1,
+                        next_intersections=(
+                            intersection1,
+                            None
+                        ),
+                        length=self.street_length
+                    )
+                self.graph[(intersection1, intersection2)] = (lane1, lane2)
             except KeyError:
                 pass
 
-    def __str__(self):
-        string = []
-        for _ in range(self.width):
-            string += "  |"
-        string += "\n"
 
-        for _ in range(self.height):
-            for _ in range (self.width):
-                string += "--+"
-            string += "--"
-            string += "\n"
-            for _ in range(self.width):
-                string += "  |"
-            string += "\n"
-        return "".join(string)
+    # def __str__(self):
+    #     string = []
+    #     for _ in range(self.width):
+    #         string += "  |"
+    #     string += "\n"
+
+    #     for _ in range(self.height):
+    #         for _ in range (self.width):
+    #             string += "--+"
+    #         string += "--"
+    #         string += "\n"
+    #         for _ in range(self.width):
+    #             string += "  |"
+    #         string += "\n"
+    #     return "".join(string)
     
     def step(self):
-        #* Determine if cars should be added to the system
-        for i in self.intersections: # for each coordinate
-            if i in self.corners:
-                random.seed()
-                if self.p_enter > random.randint(0, 100) * 0.01:
-                    if random.randint(0, 100) * 0.01 < 0.5:
-                        print("enter at (" + ", ".join(str(j) for j in i) + ") primary") # enter at (0, 0) primary
-                        # street = self.graph[(i, self.intersections[(i[0], i[1] + 1)])]
-                    else:
-                        print("enter at (" + ", ".join(str(j) for j in i) + ") secondary") # enter at (0, 0) secondary
-                random.seed()
-                if self.p_exit > random.randint(0, 100) * 0.01:
-                    if random.randint(0, 100) * 0.01 < 0.5:
-                        print("exit at (" + ", ".join(str(j) for j in i) + ") primary") # exit at (0, 0) primary
-                    else:
-                        print("exit at (" + ", ".join(str(j) for j in i) + ") secondary") # exit at (0, 0) secondary
-            elif (i[0] in [0, self.width - 1]) or (i[1] in [0, self.height - 1]): # if it is an edge coordinate
-                # for each edge coordinate:
-                random.seed()
-                if self.p_enter > random.randint(0, 100) * 0.01:
-                    print("enter at (" + ", ".join(str(j) for j in i) + ")") # enter at (0, 0)
+        for i in self.graph:
+            print(i, self.graph[i])
+            
 
-                random.seed()
-                if self.p_exit > random.randint(0, 100) * 0.01:
-                    print("exit at (" + ", ".join(str(j) for j in i) + ")") # exit at (0, 0)
-                    
-        #* Move cars through grid
-        pass
-
-my_grid = Grid(3, 3, .1)
+my_grid = Grid(3, 3, .1, 4)
 my_grid.step()
-
-# for t in range(100):
-#     grid.step()
