@@ -1,7 +1,16 @@
 from streets.intersection import Intersection
 from streets.lane import Lane
 import random
-from datetime import datetime
+
+def flip(p):
+	random.seed()
+	if (random.randint(0, 100) * 0.01) < p:
+		return True
+	else:
+		return False
+
+class CapacityError(Exception):
+	pass
 
 class Grid(object):
 	"""
@@ -10,164 +19,119 @@ class Grid(object):
 	p_enter (float): Probability that a car enters the grid
 	p_exit (float): Probability that a car exits the grid
 	street_length (int): Number of cars each street can hold
+	light_state (bool)
 
 	intersections: {
-		(x_coord, y_coord): Intersection((x, y), timing, light_state),
-		...
-	}
-	graph: {
-		(Intersection1, Intersection2): (cars waiting for Intersection1, cars waiting for Intersection2),
+		(x_coord, y_coord): Intersection((x, y), queue=(0,0,0,0)),
 		...
 	}
 	"""
-	def __init__(self, width, height, p_enter, street_length):
+	def __init__(self, width, height, p_enter, street_length, light_timing, light_state=False):
 		self.width = width
 		self.height = height
 		self.p_enter = p_enter
 		self.street_length = street_length
 		self.intersections = {}
-		self.graph = {}
+		self.light_timing = light_timing
+		self.light_state = light_state
+
 		self.corners = [
-			(0,0),
-			(0, self.width-1),
-			(self.height-1, 0),
-			(self.width-1, self.height-1)
+			(0, 0),
+			(self.width - 1, 0),
+			(0, self.height - 1),
+			(self.width - 1, self.height - 1)
 		]
+
+		square = [ (i, j) for i in range(width) for j in range(height) if i in [0, width - 1] or j in [0, height - 1]  ]
+		self.edges = list(set(square) - set(self.corners))
+
 		for i in range(width):
 			for j in range(height):
-				self.intersections[(i, j)] = Intersection((i, j), 60, True)
+				self.intersections[(i, j)] = Intersection((i, j))
 
-		for i in self.intersections:
-			x_coord = i[0]
-			y_coord = i[1]
+	def step(self, time):
+		if (time != 0) and (time % self.light_timing == 0):
+			self.light_state = not self.light_state
 
-			intersection1 = self.intersections[(x_coord, y_coord)]
+		for coordinate_pair in self.intersections:
+			if coordinate_pair in self.edges: # An edge
+				if flip(self.p_enter):
+					if coordinate_pair[0] == 0:
+						self.intersections[coordinate_pair].update_queue('right', 1)
+					elif coordinate_pair[0] == self.width - 1:
+						self.intersections[coordinate_pair].update_queue('left', 1)
+					elif coordinate_pair[1] == 0:
+						self.intersections[coordinate_pair].update_queue('up', 1)
+					elif coordinate_pair[1] == self.height - 1:
+						self.intersections[coordinate_pair].update_queue('down', 1)
+			elif coordinate_pair in self.corners: # A corner
+				if flip(self.p_enter):
+					if flip(.5):
+						# Primary
+						if (coordinate_pair == (0, 0)):
+							self.intersections[coordinate_pair].update_queue('up', 1)
+						elif (coordinate_pair == (self.width - 1, 0)):
+							self.intersections[coordinate_pair].update_queue('up', 1)
+						elif (coordinate_pair == (0, self.height - 1)):
+							self.intersections[coordinate_pair].update_queue('down', 1)
+						elif (coordinate_pair == (self.width - 1, self.height - 1)):
+							self.intersections[coordinate_pair].update_queue('down', 1)
+					else:
+						# Secondary
+						if (coordinate_pair == (0, 0)):
+							self.intersections[coordinate_pair].update_queue('right', 1)
+						elif (coordinate_pair == (self.width - 1, 0)):
+							self.intersections[coordinate_pair].update_queue('left', 1)
+						elif (coordinate_pair == (0, self.height - 1)):
+							self.intersections[coordinate_pair].update_queue('right', 1)
+						elif (coordinate_pair == (self.width - 1, self.height - 1)):
+							self.intersections[coordinate_pair].update_queue('left', 1)
 
-			
-			try: #! Primary Axis
-				intersection2 = self.intersections[(x_coord + 1, y_coord)]
+			if self.light_state == True:
+				#* True means cars can go up or down 
+				#* False means cars can go left or right
+				for d in ['up', 'down']:
+					if self.intersections[coordinate_pair].queue[d] > 0:
+						x = self.intersections[coordinate_pair].position[0]
+						y = self.intersections[coordinate_pair].position[1]
+						y_direction = 1 if d is 'up' else - 1
+						try:
+							#! The next intersection exists!
+							has_space = bool(self.intersections[(x, y + y_direction)].queue[d] <= self.street_length)
+							if has_space:
+								self.intersections[coordinate_pair].update_queue(d, -1)
+								self.intersections[(x, y + y_direction)].update_queue(d, 1)
+							else:
+								raise CapacityError("Not enough space at the desired intersection; car cannot pass.")
+						except KeyError:
+							#! The next intersection doesn't exist :(
+							self.intersections[coordinate_pair].update_queue(d, -1)
+						except CapacityError:
+							print("Capacity Error happened, continuing...")
+			else:
+				for d in ['left', 'right']:
+					if self.intersections[coordinate_pair].queue[d] > 0:
+						x = self.intersections[coordinate_pair].position[0]
+						y = self.intersections[coordinate_pair].position[1]
+						x_direction = 1 if d is 'right' else - 1
+						try:
+							#! The next intersection exists!
+							has_space = bool(self.intersections[(x + x_direction, y)].queue[d] <= self.street_length)
+							if has_space:
+								self.intersections[coordinate_pair].update_queue(d, -1)
+								self.intersections[(x + x_direction, y)].update_queue(d, 1)
+							else:
+								raise CapacityError("Not enough space at the desired intersection; car cannot pass.")
+						except KeyError:
+							#! The next intersection doesn't exist :(
+							self.intersections[coordinate_pair].update_queue(d, -1)
+						except CapacityError:
+							print("Capacity Error happened, continuing...")
 
-				if (x_coord + 2) in range(0, self.width): ###! Lane1
-					lane1 = Lane(
-						intersection1,
-						intersection2,
-						next_intersections=(
-							intersection2,
-							self.intersections[(x_coord + 2, y_coord)]
-						),
-						length=self.street_length
-					)
-				else:
-					lane1 = Lane(
-						intersection1,
-						intersection2,
-						next_intersections=(
-							intersection2,
-							None
-						),
-						length=self.street_length
-					)
+my_grid = Grid(3, 3, .8, 5, 5)
 
-				if (x_coord - 1) in range(0, self.width): ###! Lane2
-					lane2 = Lane(
-						intersection2,
-						intersection1,
-						next_intersections=(
-							intersection1,
-							self.intersections[(x_coord - 1, y_coord)]
-						),
-						length=self.street_length
-					)
-				else:
-					lane2 = Lane(
-						intersection2,
-						intersection1,
-						next_intersections=(
-							intersection1,
-							None
-						),
-						length=self.street_length
-					)
-				self.graph[(intersection1, intersection2)] = (lane1, lane2)
-			except KeyError:
-				pass
+for t in range(100):
+	random.seed()
+	my_grid.step(t)
 
-			try: #! Secondary Axis
-				intersection2 = self.intersections[(x_coord, y_coord + 1)]
-
-				if (y_coord + 2) in range(0, self.height): ###! Lane1
-					lane1 = Lane(
-						intersection1,
-						intersection2,
-						next_intersections=(
-							intersection2,
-							self.intersections[(x_coord, y_coord + 2)]
-						),
-						length=self.street_length
-					)
-				else:
-					lane1 = Lane(
-						intersection1,
-						intersection2,
-						next_intersections=(
-							intersection2,
-							None
-						),
-						length=self.street_length
-					)
-
-				if (y_coord - 1) in range(0, self.height): ###! Lane2
-					lane2 = Lane(
-						intersection2,
-						intersection1,
-						next_intersections=(
-							intersection1,
-							self.intersections[(x_coord, y_coord - 1)]
-						),
-						length=self.street_length
-					)
-				else:
-					lane2 = Lane(
-						intersection2,
-						intersection1,
-						next_intersections=(
-							intersection1,
-							None
-						),
-						length=self.street_length
-					)
-				self.graph[(intersection1, intersection2)] = (lane1, lane2)
-			except KeyError:
-				pass
-
-
-	# def __str__(self):
-	#     string = []
-	#     for _ in range(self.width):
-	#         string += "  |"
-	#     string += "\n"
-
-	#     for _ in range(self.height):
-	#         for _ in range (self.width):
-	#             string += "--+"
-	#         string += "--"
-	#         string += "\n"
-	#         for _ in range(self.width):
-	#             string += "  |"
-	#         string += "\n"
-	#     return "".join(string)
-	
-	def step(self):
-		for i in self.intersections: #* For each pair of intersections
-			if (
-				i[0] in [0, self.width - 1] or
-				i[1] in [0, self.height - 1]
-			):
-				#? HOW THE FUCK CAN THIS WORK
-				print("I1: " + str(self.intersections[i]))
-				print("I2: " + str(self.intersections[(i[0] + 1, i[1])]))
-				# print(self.graph[(self.intersections[i], self.intersections[(i[0] + 1, i[1])])])
-
-my_grid = Grid(3, 3, .1, 4)
-my_grid.step()
-print(my_grid.graph)
+print(my_grid.intersections)

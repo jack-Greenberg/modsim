@@ -4,16 +4,15 @@ class Intersection(object):
     light_state (bool): True if cars allowed to pass on primary axis, False if cars allowed on secondary axis
     light_timing (int): Number of seconds in a timing cycle 
     """
-    def __init__(self, position, light_timing, light_state=True):
+    def __init__(self, position):
         self.position = position
-        self.light_state = light_state
-        self.light_timing = light_timing
+        self.queue = {'up': 0,'down': 0,'right': 0,'left': 0}
 
     def __str__(self):
-        return '(' + ', '.join(str(m) for m in self.position) + ')'
+        return str(self.queue) + '\n'
 
     def __repr__(self):
-        return '(' + ', '.join(str(m) for m in self.position) + ')'
+        return str(self.queue) + '\n'
 
-    def change_light(self):
-        self.light_state = not self.light_state
+    def update_queue(self, d, change):
+        self.queue[d] += change
